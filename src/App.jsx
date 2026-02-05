@@ -562,7 +562,7 @@ export default function RentWise() {
     const bedsStr = String(unit.beds || "");
     const bedrooms = bedsStr.toLowerCase().includes("studio") ? "0" : (bedsStr.match(/\d+/) || [""])[0];
     const leaseStr = String(b.leaseTerms || "");
-    const leaseMatch = leaseStr.match(/(\d+)\s*[-\u2013]\s*(\d+)/);
+    const leaseMatch = leaseStr.match(/(\d+)\s*[-–]\s*(\d+)/);
     const leaseterm = leaseMatch ? leaseMatch[2] : (leaseStr.match(/(\d+)/) || [""])[0];
     const addrParts = (b.address || "").split(",").map(s => s.trim());
     const street = addrParts[0] || "";
@@ -573,10 +573,10 @@ export default function RentWise() {
     const trashIncluded = included.some(u => u.includes("trash"));
     const electricIncluded = included.some(u => u.includes("electric"));
     const notesParts = [];
-    if (b.special) notesParts.push("\ud83c\udf89 " + b.special);
-    if (b.utilitiesIncluded?.length > 0) notesParts.push("\u2705 Included: " + b.utilitiesIncluded.join(", "));
-    if (unit.available) notesParts.push("\ud83d\udcc5 Available: " + unit.available);
-    notesParts.push("\ud83d\udd17 " + importUrl.trim());
+    if (b.special) notesParts.push("🎉 " + b.special);
+    if (b.utilitiesIncluded?.length > 0) notesParts.push("✅ Included: " + b.utilitiesIncluded.join(", "));
+    if (unit.available) notesParts.push("📅 Available: " + unit.available);
+    notesParts.push("🔗 " + importUrl.trim());
     const prefilled = {
       name: b.name + (unit.unit ? " #" + unit.unit : ""),
       neighborhood: b.neighborhood || "", city, address: street, unit: unit.unit || "",
@@ -675,9 +675,9 @@ export default function RentWise() {
         </div>
         <div style={{ flex: 1, padding: "10px 0" }}>
           {[
-            { key: "home", icon: "\ud83c\udfe1", label: "Home" },
-            { key: "calculator", icon: "\ud83e\uddee", label: "Cost Calculator" },
-            { key: "import", icon: "\ud83d\udd17", label: "Import Listing" },
+            { key: "home", icon: "🏡", label: "Home" },
+            { key: "calculator", icon: "🧮", label: "Cost Calculator" },
+            { key: "import", icon: "🔗", label: "Import Listing" },
           ].map(item => (
             <button key={item.key} className={`menu-item ${page === item.key ? "active" : ""}`} onClick={() => goToPage(item.key)}>
               <span style={{ fontSize: 20 }}>{item.icon}</span>
@@ -710,7 +710,7 @@ export default function RentWise() {
           </div>
         )}
         <button onClick={() => { const link = `${window.location.origin}${window.location.pathname}?id=${userId}`; navigator.clipboard.writeText(link).then(() => toast.show("Share link copied!")).catch(() => toast.show("Share link copied!")); }} style={{ background: "rgba(255,255,255,0.6)", border: "1px solid var(--rose-200)", borderRadius: 8, padding: isMobile ? "5px 10px" : "5px 11px", cursor: "pointer", fontSize: isMobile ? 10 : 11, fontFamily: "'DM Sans', sans-serif", color: "var(--rose-700)", fontWeight: 500, display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
-          \ud83d\udd17 {isMobile ? "Share" : "Copy Link"}
+          🔗 {isMobile ? "Share" : "Copy Link"}
         </button>
       </div>
 
@@ -727,14 +727,14 @@ export default function RentWise() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 20 }}>
             <button className="action-btn" onClick={() => goToPage("import")} style={{ padding: isMobile ? "18px 16px" : "22px 24px", border: "1.5px solid var(--rose-200)", borderRadius: 14, background: "#fff", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>\ud83d\udd17</div>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🔗</div>
               <div>
                 <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 17, color: "var(--dark)", marginBottom: 3 }}>Import a Listing</div>
                 <div style={{ fontSize: 12.5, color: "var(--rose-700)", lineHeight: 1.4 }}>Paste any apartment URL — we'll pull in pricing, fees, and details automatically with AI.</div>
               </div>
             </button>
             <button className="action-btn" onClick={() => { goToPage("calculator"); setView("input"); addApartment(); }} style={{ padding: isMobile ? "18px 16px" : "22px 24px", border: "1.5px solid var(--rose-200)", borderRadius: 14, background: "#fff", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg, var(--rose-300) 0%, var(--rose-400) 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>\u270f\ufe0f</div>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg, var(--rose-300) 0%, var(--rose-400) 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>✏️</div>
               <div>
                 <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 17, color: "var(--dark)", marginBottom: 3 }}>Add Manually</div>
                 <div style={{ fontSize: 12.5, color: "var(--rose-700)", lineHeight: 1.4 }}>Enter apartment details and costs by hand in the Cost Calculator.</div>
@@ -743,13 +743,13 @@ export default function RentWise() {
           </div>
           {filledApts.length > 0 && (
             <div style={{ background: "#fff", borderRadius: 14, border: "1.5px solid var(--rose-200)", padding: isMobile ? "18px 16px" : "22px 24px", marginBottom: 20 }}>
-              <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 14 }}>\ud83d\udcca Your Dashboard</div>
+              <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 14 }}>📊 Your Dashboard</div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: isMobile ? 14 : 20 }}>
                 {[
-                  { label: "Apartments", value: apartments.length, icon: "\ud83c\udfe0" },
-                  { label: "Avg Monthly", value: `$${Math.round(filledApts.reduce((s,a) => s + getTotal(a), 0) / filledApts.length).toLocaleString()}`, icon: "\ud83d\udcb0" },
-                  { label: "Range", value: filledApts.length > 1 ? `$${getTotal(sorted.find(a=>getTotal(a)>0)||sorted[0]).toLocaleString()} \u2013 $${getTotal([...sorted].reverse().find(a=>getTotal(a)>0)||sorted[0]).toLocaleString()}` : "\u2014", icon: "\ud83d\udcc8" },
-                  { label: "Areas", value: neighborhoodNames.length || "\u2014", icon: "\ud83d\udccd" },
+                  { label: "Apartments", value: apartments.length, icon: "🏠" },
+                  { label: "Avg Monthly", value: `$${Math.round(filledApts.reduce((s,a) => s + getTotal(a), 0) / filledApts.length).toLocaleString()}`, icon: "💰" },
+                  { label: "Range", value: filledApts.length > 1 ? `$${getTotal(sorted.find(a=>getTotal(a)>0)||sorted[0]).toLocaleString()} – $${getTotal([...sorted].reverse().find(a=>getTotal(a)>0)||sorted[0]).toLocaleString()}` : "—", icon: "📈" },
+                  { label: "Areas", value: neighborhoodNames.length || "—", icon: "📍" },
                 ].map(s => (
                   <div key={s.label} style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 24, marginBottom: 4 }}>{s.icon}</div>
@@ -766,7 +766,7 @@ export default function RentWise() {
                 if (savings <= 0) return null;
                 return (
                   <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: "var(--green-light)", border: "1px solid rgba(74,154,109,0.25)" }}>
-                    <div style={{ fontSize: 13, color: "#2e6b4a", fontWeight: 600 }}>\ud83d\udcb0 {cheapest.name || "Your best deal"} saves <span style={{ color: "var(--green)" }}>${savings.toLocaleString()}/mo</span> vs {expensive.name || "the most expensive"}</div>
+                    <div style={{ fontSize: 13, color: "#2e6b4a", fontWeight: 600 }}>💰 {cheapest.name || "Your best deal"} saves <span style={{ color: "var(--green)" }}>${savings.toLocaleString()}/mo</span> vs {expensive.name || "the most expensive"}</div>
                     <div style={{ fontSize: 12, color: "#3a7a55", marginTop: 2 }}>That's <strong>${(savings * 12).toLocaleString()}/year</strong> in savings.</div>
                   </div>
                 );
@@ -776,8 +776,8 @@ export default function RentWise() {
           {filledApts.length > 0 && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600 }}>\ud83c\udfe0 Your Apartments</div>
-                <button onClick={() => { goToPage("calculator"); setView("cards"); }} style={{ fontSize: 12, color: "var(--rose-500)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>View All \u2192</button>
+                <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600 }}>🏠 Your Apartments</div>
+                <button onClick={() => { goToPage("calculator"); setView("cards"); }} style={{ fontSize: 12, color: "var(--rose-500)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>View All →</button>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                 {filledApts.slice(0, 4).map((apt, idx) => {
@@ -788,11 +788,11 @@ export default function RentWise() {
                       <div onClick={() => { goToPage("calculator"); setView("input"); setActiveTab(apt.id); }} style={{ background: "#fff", borderRadius: 12, border: isCheapest ? "1.5px solid var(--green)" : "1.5px solid var(--border)", padding: "14px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                            {isCheapest && <span style={{ fontSize: 8, letterSpacing: 1, textTransform: "uppercase", fontWeight: 700, background: "var(--green)", color: "#fff", padding: "1px 5px", borderRadius: 3 }}>\u2713 Best</span>}
-                            {apt.neighborhood && <span style={{ fontSize: 10, color: "var(--rose-600)", fontWeight: 500 }}>\ud83d\udccd {apt.neighborhood}</span>}
+                            {isCheapest && <span style={{ fontSize: 8, letterSpacing: 1, textTransform: "uppercase", fontWeight: 700, background: "var(--green)", color: "#fff", padding: "1px 5px", borderRadius: 3 }}>✓ Best</span>}
+                            {apt.neighborhood && <span style={{ fontSize: 10, color: "var(--rose-600)", fontWeight: 500 }}>📍 {apt.neighborhood}</span>}
                           </div>
                           <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 15, color: "var(--dark)", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{apt.name || `Apartment ${apartments.indexOf(apt) + 1}`}</div>
-                          <div style={{ fontSize: 11, color: "var(--rose-700)", marginTop: 2 }}>{[apt.city, apt.bedrooms && `${apt.bedrooms}BR`, apt.sqft && `${apt.sqft} sqft`].filter(Boolean).join(" \u00b7 ")}</div>
+                          <div style={{ fontSize: 11, color: "var(--rose-700)", marginTop: 2 }}>{[apt.city, apt.bedrooms && `${apt.bedrooms}BR`, apt.sqft && `${apt.sqft} sqft`].filter(Boolean).join(" · ")}</div>
                         </div>
                         <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
                           <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "var(--rose-600)" }}>${total.toLocaleString()}</div>
@@ -807,7 +807,7 @@ export default function RentWise() {
           )}
           {filledApts.length === 0 && (
             <div style={{ textAlign: "center", padding: "48px 24px", background: "#fff", borderRadius: 16, border: "1.5px solid var(--rose-200)" }}>
-              <div style={{ fontSize: 44, marginBottom: 14 }}>\u2728</div>
+              <div style={{ fontSize: 44, marginBottom: 14 }}>✨</div>
               <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: "var(--dark)", marginBottom: 6 }}>Get started</div>
               <div style={{ fontSize: 13.5, color: "var(--rose-700)", lineHeight: 1.6, maxWidth: 380, margin: "0 auto" }}>Import your first listing or add an apartment manually to start comparing true monthly costs.</div>
             </div>
@@ -1417,7 +1417,7 @@ export default function RentWise() {
               <div style={{ background: "linear-gradient(135deg, #fbeaef 0%, #f6d5df 100%)", borderRadius: 18, padding: isMobile ? "28px 20px" : "40px 36px", marginBottom: 20, position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 80% 60% at 75% 40%, rgba(220,86,126,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
                 <div style={{ position: "relative", zIndex: 1 }}>
-                  <div style={{ fontSize: isMobile ? 10.5 : 10, letterSpacing: 3.5, textTransform: "uppercase", color: "var(--rose-600)", marginBottom: 8, fontWeight: 600 }}>\ud83d\udd17 AI Import</div>
+                  <div style={{ fontSize: isMobile ? 10.5 : 10, letterSpacing: 3.5, textTransform: "uppercase", color: "var(--rose-600)", marginBottom: 8, fontWeight: 600 }}>🔗 AI Import</div>
                   <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: isMobile ? 26 : 34, fontWeight: 400, color: "var(--rose-900)", lineHeight: 1.15, letterSpacing: -0.5, marginBottom: 10 }}>Import a <span style={{ fontStyle: "italic", color: "var(--rose-500)" }}>Listing</span></h1>
                   <p style={{ fontSize: isMobile ? 13 : 14, color: "var(--rose-800)", lineHeight: 1.6, maxWidth: 480 }}>Paste an apartment listing URL from Apartments.com, Zillow, Trulia, or any other listing site. Our AI will extract unit details, pricing, and fees automatically.</p>
                 </div>
@@ -1426,11 +1426,11 @@ export default function RentWise() {
                 <label style={{ display: "block", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--rose-700)", fontWeight: 600, marginBottom: 8 }}>Listing URL</label>
                 <div style={{ display: "flex", gap: 10, flexDirection: isMobile ? "column" : "row" }}>
                   <input ref={importInputRef} type="url" value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && handleImport()} placeholder="https://www.apartments.com/..." style={{ flex: 1, padding: "12px 14px", border: "1.5px solid var(--rose-200)", borderRadius: 10, fontSize: 14, fontFamily: "'DM Sans', sans-serif", color: "var(--dark)", background: "var(--warm-white)" }} />
-                  <button onClick={handleImport} disabled={!importUrl.trim()} style={{ padding: "12px 24px", border: "none", borderRadius: 10, cursor: importUrl.trim() ? "pointer" : "default", background: importUrl.trim() ? "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)" : "var(--rose-100)", color: importUrl.trim() ? "#fff" : "var(--rose-300)", fontSize: 14, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>Import Listing \u2728</button>
+                  <button onClick={handleImport} disabled={!importUrl.trim()} style={{ padding: "12px 24px", border: "none", borderRadius: 10, cursor: importUrl.trim() ? "pointer" : "default", background: importUrl.trim() ? "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)" : "var(--rose-100)", color: importUrl.trim() ? "#fff" : "var(--rose-300)", fontSize: 14, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>Import Listing ✨</button>
                 </div>
                 {importError && (
                   <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 10, background: "var(--coral-light)", border: "1px solid rgba(192,112,96,0.3)" }}>
-                    <div style={{ fontSize: 13, color: "var(--coral)", fontWeight: 600 }}>\u26a0 Import Failed</div>
+                    <div style={{ fontSize: 13, color: "var(--coral)", fontWeight: 600 }}>⚠ Import Failed</div>
                     <div style={{ fontSize: 12.5, color: "#8b5a4f", marginTop: 4, lineHeight: 1.5 }}>{importError}</div>
                   </div>
                 )}
@@ -1461,7 +1461,7 @@ export default function RentWise() {
                 <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: isMobile ? 22 : 26, color: "var(--rose-900)", lineHeight: 1.2 }}>{importData.building.name}</div>
                 <div style={{ fontSize: 13, color: "var(--rose-700)", marginTop: 4 }}>{importData.building.address}</div>
                 <div style={{ fontSize: 13, color: "var(--rose-600)", marginTop: 4, fontWeight: 600 }}>{importData.units.length} units found</div>
-                {importData.building.special && (<div style={{ marginTop: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.6)", fontSize: 12.5, color: "var(--rose-800)", lineHeight: 1.5 }}>\ud83c\udf89 {importData.building.special}</div>)}
+                {importData.building.special && (<div style={{ marginTop: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.6)", fontSize: 12.5, color: "var(--rose-800)", lineHeight: 1.5 }}>🎉 {importData.building.special}</div>)}
               </div>
               {(() => {
                 const bedTypes = [...new Set(importData.units.map(u => u.beds))].sort();
@@ -1473,8 +1473,8 @@ export default function RentWise() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--dark)" }}>{unit.unit || `Unit ${i + 1}`}</div>
-                        <div style={{ fontSize: 11.5, color: "var(--rose-700)", marginTop: 2 }}>{[unit.beds, unit.baths && `${unit.baths} ba`, unit.sqft && `${unit.sqft} sqft`].filter(Boolean).join(" \u00b7 ")}</div>
-                        {unit.available && <div style={{ fontSize: 11, color: "var(--rose-600)", marginTop: 3 }}>\ud83d\udcc5 {unit.available}</div>}
+                        <div style={{ fontSize: 11.5, color: "var(--rose-700)", marginTop: 2 }}>{[unit.beds, unit.baths && `${unit.baths} ba`, unit.sqft && `${unit.sqft} sqft`].filter(Boolean).join(" · ")}</div>
+                        {unit.available && <div style={{ fontSize: 11, color: "var(--rose-600)", marginTop: 3 }}>📅 {unit.available}</div>}
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "var(--rose-600)" }}>${parseInt(String(unit.rent).replace(/[^0-9]/g, "")).toLocaleString()}</div>
@@ -1484,7 +1484,7 @@ export default function RentWise() {
                   </button>
                 ))}
               </div>
-              <button onClick={handleImportAnother} style={{ marginTop: 16, padding: "10px 18px", border: "1px solid var(--rose-200)", borderRadius: 10, background: "transparent", cursor: "pointer", fontSize: 13, color: "var(--rose-700)", fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>\u2190 Try Different URL</button>
+              <button onClick={handleImportAnother} style={{ marginTop: 16, padding: "10px 18px", border: "1px solid var(--rose-200)", borderRadius: 10, background: "transparent", cursor: "pointer", fontSize: 13, color: "var(--rose-700)", fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>← Try Different URL</button>
             </div>
           )}
           {importStep === 3 && importPrefilled && (
@@ -1497,11 +1497,11 @@ export default function RentWise() {
                 </div>
                 <div style={{ padding: isMobile ? "18px 16px" : "22px 24px" }}>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 18 }}>
-                    {[{ label: "Bedrooms", value: importPrefilled.bedrooms === "0" ? "Studio" : `${importPrefilled.bedrooms} BR` }, { label: "Sq Ft", value: importPrefilled.sqft || "\u2014" }, { label: "Lease", value: importPrefilled.leaseterm ? `${importPrefilled.leaseterm} mo` : "\u2014" }, { label: "Neighborhood", value: importPrefilled.neighborhood || "\u2014" }].map(d => (
+                    {[{ label: "Bedrooms", value: importPrefilled.bedrooms === "0" ? "Studio" : `${importPrefilled.bedrooms} BR` }, { label: "Sq Ft", value: importPrefilled.sqft || "—" }, { label: "Lease", value: importPrefilled.leaseterm ? `${importPrefilled.leaseterm} mo` : "—" }, { label: "Neighborhood", value: importPrefilled.neighborhood || "—" }].map(d => (
                       <div key={d.label}><div style={{ fontSize: 9.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 2 }}>{d.label}</div><div style={{ fontSize: 14, fontWeight: 600, color: "var(--dark)" }}>{d.value}</div></div>
                     ))}
                   </div>
-                  <div style={{ fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 8 }}>\ud83d\udcb0 Monthly Costs</div>
+                  <div style={{ fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 8 }}>💰 Monthly Costs</div>
                   {COST_CATEGORIES.filter(cat => importPrefilled.costs[cat.key] && importPrefilled.costs[cat.key] !== "0").map(cat => (
                     <div key={cat.key} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid var(--rose-100)" }}>
                       <span style={{ fontSize: 13, color: "#3a3a3a" }}>{cat.icon} {cat.label}</span>
@@ -1512,10 +1512,10 @@ export default function RentWise() {
                     <span style={{ fontSize: 13, fontWeight: 600 }}>Estimated Monthly Total</span>
                     <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: "var(--dark)" }}>${COST_CATEGORIES.reduce((s, c) => s + (parseInt(importPrefilled.costs[c.key]) || 0), 0).toLocaleString()}</span>
                   </div>
-                  {importPrefilled.notes && (<div style={{ marginTop: 16 }}><div style={{ fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 6 }}>\ud83d\udcdd Notes</div><div style={{ fontSize: 12.5, color: "#5a5a5a", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{importPrefilled.notes}</div></div>)}
+                  {importPrefilled.notes && (<div style={{ marginTop: 16 }}><div style={{ fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 6 }}>📝 Notes</div><div style={{ fontSize: 12.5, color: "#5a5a5a", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{importPrefilled.notes}</div></div>)}
                   <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                    <button onClick={() => setImportStep(2)} style={{ flex: 1, padding: "12px 16px", border: "1px solid var(--rose-200)", borderRadius: 10, background: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 500, color: "var(--rose-700)", fontFamily: "'DM Sans', sans-serif" }}>\u2190 Pick Different Unit</button>
-                    <button onClick={handleAddToRentwise} style={{ flex: 1, padding: "12px 16px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#fff", fontFamily: "'DM Sans', sans-serif" }}>Add to RentWise \u2728</button>
+                    <button onClick={() => setImportStep(2)} style={{ flex: 1, padding: "12px 16px", border: "1px solid var(--rose-200)", borderRadius: 10, background: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 500, color: "var(--rose-700)", fontFamily: "'DM Sans', sans-serif" }}>← Pick Different Unit</button>
+                    <button onClick={handleAddToRentwise} style={{ flex: 1, padding: "12px 16px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#fff", fontFamily: "'DM Sans', sans-serif" }}>Add to RentWise ✨</button>
                   </div>
                 </div>
               </div>
@@ -1523,11 +1523,11 @@ export default function RentWise() {
           )}
           {importStep === 4 && (
             <div className="fade-up" style={{ textAlign: "center", padding: "48px 24px" }}>
-              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--green-light)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 20px", border: "2px solid var(--green)" }}>\u2713</div>
+              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--green-light)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 20px", border: "2px solid var(--green)" }}>✓</div>
               <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, color: "var(--dark)", marginBottom: 8 }}>Added to RentWise!</div>
               <div style={{ fontSize: 14, color: "var(--rose-700)", marginBottom: 24, lineHeight: 1.6 }}>{importPrefilled?.name} is now in your Cost Calculator.</div>
               <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-                <button onClick={handleImportGoToCalculator} style={{ padding: "12px 24px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#fff", fontFamily: "'DM Sans', sans-serif" }}>View in Calculator \u2192</button>
+                <button onClick={handleImportGoToCalculator} style={{ padding: "12px 24px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#fff", fontFamily: "'DM Sans', sans-serif" }}>View in Calculator →</button>
                 <button onClick={handleImportAnother} style={{ padding: "12px 24px", border: "1px solid var(--rose-200)", borderRadius: 10, background: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 500, color: "var(--rose-700)", fontFamily: "'DM Sans', sans-serif" }}>Import Another</button>
               </div>
             </div>
