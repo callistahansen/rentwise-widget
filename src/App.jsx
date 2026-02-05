@@ -101,6 +101,7 @@ function getUserId() {
 }
 
 /* ─── STYLES ─── */
+
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -157,7 +158,25 @@ const styles = `
   
   /* Input hover */
   input:not(:focus):hover, textarea:not(:focus):hover { border-color: var(--rose-300) !important; }
+
+  /* Menu overlay */
+  .menu-overlay { position: fixed; inset: 0; background: rgba(42,9,19,0.4); z-index: 900; opacity: 0; transition: opacity 0.25s ease; pointer-events: none; }
+  .menu-overlay.open { opacity: 1; pointer-events: all; }
+  .menu-drawer { position: fixed; top: 0; left: -280px; width: 270px; height: 100%; background: #fff; z-index: 901; transition: left 0.28s cubic-bezier(0.4,0,0.2,1); box-shadow: 4px 0 24px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+  .menu-drawer.open { left: 0; }
+  .menu-item { display: flex; align-items: center; gap: 12px; padding: 14px 22px; border: none; background: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--dark); width: 100%; text-align: left; transition: background 0.15s; border-radius: 0; }
+  .menu-item:hover { background: var(--rose-50); }
+  .menu-item.active { background: linear-gradient(135deg, var(--rose-50) 0%, var(--rose-100) 100%); color: var(--rose-600); font-weight: 600; }
+
+  /* Import animations */
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  .fade-up { animation: fadeUp 0.4s ease forwards; }
 `;
+
+
 
 
 /* ─── DATA ─── */
@@ -238,6 +257,7 @@ function loadApartmentsLocal() {
   return [emptyApartment()];
 }
 
+
 export default function RentWise() {
   const isMobile = useMobile();
   const toast = useToast();
@@ -252,6 +272,21 @@ export default function RentWise() {
   const [compareSelection, setCompareSelection] = useState([]);
   const [photoGallery, setPhotoGallery] = useState({ show: false, aptId: null, photoIndex: 0 });
   const saveTimerRef = useRef(null);
+
+  // Page-level nav: "home", "calculator", "import"
+  const [page, setPage] = useState("home");
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Import state
+  const [importStep, setImportStep] = useState(0);
+  const [importUrl, setImportUrl] = useState("");
+  const [importData, setImportData] = useState(null);
+  const [importSelectedUnit, setImportSelectedUnit] = useState(null);
+  const [importPrefilled, setImportPrefilled] = useState(null);
+  const [importFilter, setImportFilter] = useState("All");
+  const [importLoadingMsg, setImportLoadingMsg] = useState("");
+  const [importError, setImportError] = useState("");
+  const importInputRef = useRef(null);
 
   // Load from cloud on first mount
   useEffect(() => {
@@ -433,12 +468,13 @@ export default function RentWise() {
       }
       if (e.key === "Escape") {
         if (confirmModal.show) setConfirmModal({ show: false, message: "", onConfirm: null });
+        else if (menuOpen) setMenuOpen(false);
         else if (showComparison) setShowComparison(false);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [photoGallery.show, confirmModal.show, showComparison, closePhotoGallery, navigateGallery]);
+  }, [photoGallery.show, confirmModal.show, showComparison, menuOpen, closePhotoGallery, navigateGallery]);
 
   const getTotal = useCallback((apt) => COST_CATEGORIES.reduce((s, c) => s + (parseFloat(apt.costs[c.key]) || 0), 0), []);
   const getMoveInTotal = useCallback((apt) => MOVEIN_FIELDS.reduce((s, f) => s + (parseFloat(apt.movein[f.key]) || 0), 0), []);
@@ -481,6 +517,102 @@ export default function RentWise() {
     });
     return map;
   }, [filledApts]);
+
+
+  /* ─── IMPORT FLOW ─── */
+  const handleImport = useCallback(async () => {
+    if (!importUrl.trim()) return;
+    setImportStep(1);
+    setImportError("");
+    setImportLoadingMsg("Fetching listing page...");
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/import-listing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ url: importUrl.trim() }),
+      });
+      if (!res.ok) { const errText = await res.text(); throw new Error(errText || `Error ${res.status}`); }
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+      if (!result.building || !result.units || result.units.length === 0) throw new Error("Could not find any available units on this listing page. Try a different listing URL.");
+      setImportData(result);
+      setImportStep(2);
+      setImportFilter("All");
+    } catch (err) {
+      console.error("Import failed:", err);
+      setImportError(err.message || "Something went wrong. Please try again.");
+      setImportStep(0);
+    }
+  }, [importUrl]);
+
+  const handleSelectUnit = useCallback((unit) => {
+    if (!importData?.building) return;
+    const b = importData.building;
+    const fees = b.fees || {};
+    const rent = parseInt(String(unit.rent).replace(/[^0-9]/g, "")) || 0;
+    const internet = parseInt(String(fees.internet || "").replace(/[^0-9]/g, "")) || 0;
+    const parkingVal = fees.parkingGarage || fees.parkingSurface || fees.parking || "";
+    const parking = parseInt(String(parkingVal).replace(/[^0-9.-]/g, "").split("-")[0]) || 0;
+    const pet = parseInt(String(fees.petRent || "").replace(/[^0-9]/g, "")) || 0;
+    const storage = parseInt(String(fees.storage || "").replace(/[^0-9]/g, "")) || 0;
+    const deposit = parseInt(String(fees.securityDeposit || fees.deposit || "").replace(/[^0-9]/g, "")) || 0;
+    const appfee = parseInt(String(fees.applicationFee || fees.appFee || "").replace(/[^0-9]/g, "")) || 0;
+    const adminfee = parseInt(String(fees.adminFee || "").replace(/[^0-9]/g, "")) || 0;
+    const petdeposit = parseInt(String(fees.petDeposit || "").replace(/[^0-9]/g, "")) || 0;
+    const bedsStr = String(unit.beds || "");
+    const bedrooms = bedsStr.toLowerCase().includes("studio") ? "0" : (bedsStr.match(/\d+/) || [""])[0];
+    const leaseStr = String(b.leaseTerms || "");
+    const leaseMatch = leaseStr.match(/(\d+)\s*[-\u2013]\s*(\d+)/);
+    const leaseterm = leaseMatch ? leaseMatch[2] : (leaseStr.match(/(\d+)/) || [""])[0];
+    const addrParts = (b.address || "").split(",").map(s => s.trim());
+    const street = addrParts[0] || "";
+    const city = addrParts[1] || "";
+    const included = (b.utilitiesIncluded || []).map(u => u.toLowerCase());
+    const gasIncluded = included.some(u => u.includes("gas"));
+    const waterIncluded = included.some(u => u.includes("water"));
+    const trashIncluded = included.some(u => u.includes("trash"));
+    const electricIncluded = included.some(u => u.includes("electric"));
+    const notesParts = [];
+    if (b.special) notesParts.push("\ud83c\udf89 " + b.special);
+    if (b.utilitiesIncluded?.length > 0) notesParts.push("\u2705 Included: " + b.utilitiesIncluded.join(", "));
+    if (unit.available) notesParts.push("\ud83d\udcc5 Available: " + unit.available);
+    notesParts.push("\ud83d\udd17 " + importUrl.trim());
+    const prefilled = {
+      name: b.name + (unit.unit ? " #" + unit.unit : ""),
+      neighborhood: b.neighborhood || "", city, address: street, unit: unit.unit || "",
+      sqft: String(unit.sqft || ""), bedrooms, leaseterm, dateAvailable: "",
+      notes: notesParts.join("\n"),
+      costs: { rent: rent ? String(rent) : "", parking: parking ? String(parking) : "", electricity: electricIncluded ? "0" : "", gas: gasIncluded ? "0" : "", water: waterIncluded ? "0" : "", internet: internet ? String(internet) : "", trash: trashIncluded ? "0" : "", insurance: "", laundry: "", storage: storage ? String(storage) : "", pet: pet ? String(pet) : "", other: "" },
+      movein: { first: rent ? String(rent) : "", last: "", deposit: deposit ? String(deposit) : "", petdeposit: petdeposit ? String(petdeposit) : "", appfee: appfee ? String(appfee) : "", adminfee: adminfee ? String(adminfee) : "", broker: "", moveother: "" },
+    };
+    setImportSelectedUnit(unit);
+    setImportPrefilled(prefilled);
+    setImportStep(3);
+  }, [importData, importUrl]);
+
+  const handleAddToRentwise = useCallback(() => {
+    if (!importPrefilled) return;
+    const newApt = { ...emptyApartment(), ...importPrefilled };
+    setApartments(prev => [...prev, newApt]);
+    setImportStep(4);
+    toast.show("Apartment imported!");
+  }, [importPrefilled, toast]);
+
+  const handleImportGoToCalculator = useCallback(() => {
+    setPage("calculator");
+    setView("input");
+    setActiveTab(apartments[apartments.length - 1]?.id || null);
+    setImportStep(0); setImportUrl(""); setImportData(null);
+    setImportSelectedUnit(null); setImportPrefilled(null); setImportFilter("All"); setImportError("");
+  }, [apartments]);
+
+  const handleImportAnother = useCallback(() => {
+    setImportStep(0); setImportUrl(""); setImportData(null);
+    setImportSelectedUnit(null); setImportPrefilled(null); setImportFilter("All"); setImportError("");
+  }, []);
+
+  const goToPage = useCallback((p) => { setPage(p); setMenuOpen(false); window.scrollTo(0, 0); }, []);
+
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cream)", fontFamily: "'DM Sans', sans-serif", color: "var(--dark)" }}>
@@ -534,7 +666,159 @@ export default function RentWise() {
         </div>
       )}
 
-      {/* Header */}
+      {/* ═══════ MENU DRAWER ═══════ */}
+      <div className={`menu-overlay ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(false)} />
+      <div className={`menu-drawer ${menuOpen ? "open" : ""}`}>
+        <div style={{ padding: "26px 22px 18px", borderBottom: "1px solid var(--rose-100)" }}>
+          <div style={{ fontSize: 10, letterSpacing: 3.5, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 4 }}>RentWise</div>
+          <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "var(--rose-900)" }}>Menu</div>
+        </div>
+        <div style={{ flex: 1, padding: "10px 0" }}>
+          {[
+            { key: "home", icon: "\ud83c\udfe1", label: "Home" },
+            { key: "calculator", icon: "\ud83e\uddee", label: "Cost Calculator" },
+            { key: "import", icon: "\ud83d\udd17", label: "Import Listing" },
+          ].map(item => (
+            <button key={item.key} className={`menu-item ${page === item.key ? "active" : ""}`} onClick={() => goToPage(item.key)}>
+              <span style={{ fontSize: 20 }}>{item.icon}</span>
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+        <div style={{ padding: "14px 22px", borderTop: "1px solid var(--rose-100)", fontSize: 11, color: "var(--rose-600)" }}>
+          RentWise v2.0
+        </div>
+      </div>
+
+      {/* ═══════ TOP BAR ═══════ */}
+      <div style={{ background: "#fff", borderBottom: "1px solid var(--rose-100)", padding: isMobile ? "10px 14px" : "10px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 800, boxShadow: "0 1px 4px rgba(0,0,0,0.03)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 16 }}>
+          <button onClick={() => setMenuOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", flexDirection: "column", gap: 4 }} aria-label="Menu">
+            <div style={{ width: 20, height: 2, background: "var(--dark)", borderRadius: 2 }} />
+            <div style={{ width: 16, height: 2, background: "var(--dark)", borderRadius: 2 }} />
+            <div style={{ width: 20, height: 2, background: "var(--dark)", borderRadius: 2 }} />
+          </button>
+          <button onClick={() => goToPage("home")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            <span style={{ fontSize: isMobile ? 9.5 : 10, letterSpacing: 3, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 700 }}>RentWise</span>
+          </button>
+        </div>
+        {!isMobile && (
+          <div style={{ display: "flex", gap: 2 }}>
+            {[{ key: "home", label: "Home" }, { key: "calculator", label: "Calculator" }, { key: "import", label: "Import" }].map(item => (
+              <button key={item.key} onClick={() => goToPage(item.key)} style={{ padding: "6px 14px", border: "none", borderRadius: 6, cursor: "pointer", background: page === item.key ? "var(--rose-50)" : "transparent", color: page === item.key ? "var(--rose-600)" : "var(--dark)", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: page === item.key ? 600 : 500, transition: "all 0.15s ease" }}>{item.label}</button>
+            ))}
+          </div>
+        )}
+        <button onClick={() => { const link = `${window.location.origin}${window.location.pathname}?id=${userId}`; navigator.clipboard.writeText(link).then(() => toast.show("Share link copied!")).catch(() => toast.show("Share link copied!")); }} style={{ background: "rgba(255,255,255,0.6)", border: "1px solid var(--rose-200)", borderRadius: 8, padding: isMobile ? "5px 10px" : "5px 11px", cursor: "pointer", fontSize: isMobile ? 10 : 11, fontFamily: "'DM Sans', sans-serif", color: "var(--rose-700)", fontWeight: 500, display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+          \ud83d\udd17 {isMobile ? "Share" : "Copy Link"}
+        </button>
+      </div>
+
+      {/* ═══════════════ HOME PAGE ═══════════════ */}
+      {page === "home" && (
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: isMobile ? "20px 14px 60px" : "28px 40px 60px" }}>
+          <div style={{ background: "linear-gradient(135deg, #fbeaef 0%, #f6d5df 100%)", borderRadius: 18, padding: isMobile ? "28px 20px" : "40px 36px", marginBottom: 20, position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 80% 60% at 75% 40%, rgba(220,86,126,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ position: "relative", zIndex: 1 }}>
+              <div style={{ fontSize: isMobile ? 10.5 : 10, letterSpacing: 3.5, textTransform: "uppercase", color: "var(--rose-600)", marginBottom: 8, fontWeight: 600 }}>RentWise</div>
+              <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: isMobile ? 28 : 38, fontWeight: 400, color: "var(--rose-900)", lineHeight: 1.15, letterSpacing: -0.5, marginBottom: 12 }}>Your Apartment <span style={{ fontStyle: "italic", color: "var(--rose-500)" }}>Search</span>, Organized</h1>
+              <p style={{ fontSize: isMobile ? 13 : 14.5, color: "var(--rose-800)", lineHeight: 1.6, maxWidth: 500 }}>Import listings, compare true monthly costs, and find the best deal for your next home.</p>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 20 }}>
+            <button className="action-btn" onClick={() => goToPage("import")} style={{ padding: isMobile ? "18px 16px" : "22px 24px", border: "1.5px solid var(--rose-200)", borderRadius: 14, background: "#fff", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>\ud83d\udd17</div>
+              <div>
+                <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 17, color: "var(--dark)", marginBottom: 3 }}>Import a Listing</div>
+                <div style={{ fontSize: 12.5, color: "var(--rose-700)", lineHeight: 1.4 }}>Paste any apartment URL — we'll pull in pricing, fees, and details automatically with AI.</div>
+              </div>
+            </button>
+            <button className="action-btn" onClick={() => { goToPage("calculator"); setView("input"); addApartment(); }} style={{ padding: isMobile ? "18px 16px" : "22px 24px", border: "1.5px solid var(--rose-200)", borderRadius: 14, background: "#fff", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg, var(--rose-300) 0%, var(--rose-400) 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>\u270f\ufe0f</div>
+              <div>
+                <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 17, color: "var(--dark)", marginBottom: 3 }}>Add Manually</div>
+                <div style={{ fontSize: 12.5, color: "var(--rose-700)", lineHeight: 1.4 }}>Enter apartment details and costs by hand in the Cost Calculator.</div>
+              </div>
+            </button>
+          </div>
+          {filledApts.length > 0 && (
+            <div style={{ background: "#fff", borderRadius: 14, border: "1.5px solid var(--rose-200)", padding: isMobile ? "18px 16px" : "22px 24px", marginBottom: 20 }}>
+              <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 14 }}>\ud83d\udcca Your Dashboard</div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: isMobile ? 14 : 20 }}>
+                {[
+                  { label: "Apartments", value: apartments.length, icon: "\ud83c\udfe0" },
+                  { label: "Avg Monthly", value: `$${Math.round(filledApts.reduce((s,a) => s + getTotal(a), 0) / filledApts.length).toLocaleString()}`, icon: "\ud83d\udcb0" },
+                  { label: "Range", value: filledApts.length > 1 ? `$${getTotal(sorted.find(a=>getTotal(a)>0)||sorted[0]).toLocaleString()} \u2013 $${getTotal([...sorted].reverse().find(a=>getTotal(a)>0)||sorted[0]).toLocaleString()}` : "\u2014", icon: "\ud83d\udcc8" },
+                  { label: "Areas", value: neighborhoodNames.length || "\u2014", icon: "\ud83d\udccd" },
+                ].map(s => (
+                  <div key={s.label} style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 24, marginBottom: 4 }}>{s.icon}</div>
+                    <div style={{ fontSize: 9.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600 }}>{s.label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "var(--rose-900)", marginTop: 2, fontFamily: "'DM Serif Display', serif" }}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
+              {filledApts.length >= 2 && (() => {
+                const sortedFilled = [...filledApts].sort(costSort);
+                const cheapest = sortedFilled[0];
+                const expensive = sortedFilled[sortedFilled.length - 1];
+                const savings = getTotal(expensive) - getTotal(cheapest);
+                if (savings <= 0) return null;
+                return (
+                  <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: "var(--green-light)", border: "1px solid rgba(74,154,109,0.25)" }}>
+                    <div style={{ fontSize: 13, color: "#2e6b4a", fontWeight: 600 }}>\ud83d\udcb0 {cheapest.name || "Your best deal"} saves <span style={{ color: "var(--green)" }}>${savings.toLocaleString()}/mo</span> vs {expensive.name || "the most expensive"}</div>
+                    <div style={{ fontSize: 12, color: "#3a7a55", marginTop: 2 }}>That's <strong>${(savings * 12).toLocaleString()}/year</strong> in savings.</div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+          {filledApts.length > 0 && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600 }}>\ud83c\udfe0 Your Apartments</div>
+                <button onClick={() => { goToPage("calculator"); setView("cards"); }} style={{ fontSize: 12, color: "var(--rose-500)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>View All \u2192</button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
+                {filledApts.slice(0, 4).map((apt, idx) => {
+                  const total = getTotal(apt);
+                  const isCheapest = apt.id === cheapestId;
+                  return (
+                    <div key={apt.id} className="apt-card" style={{ animationDelay: `${idx * 0.07}s` }}>
+                      <div onClick={() => { goToPage("calculator"); setView("input"); setActiveTab(apt.id); }} style={{ background: "#fff", borderRadius: 12, border: isCheapest ? "1.5px solid var(--green)" : "1.5px solid var(--border)", padding: "14px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                            {isCheapest && <span style={{ fontSize: 8, letterSpacing: 1, textTransform: "uppercase", fontWeight: 700, background: "var(--green)", color: "#fff", padding: "1px 5px", borderRadius: 3 }}>\u2713 Best</span>}
+                            {apt.neighborhood && <span style={{ fontSize: 10, color: "var(--rose-600)", fontWeight: 500 }}>\ud83d\udccd {apt.neighborhood}</span>}
+                          </div>
+                          <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 15, color: "var(--dark)", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{apt.name || `Apartment ${apartments.indexOf(apt) + 1}`}</div>
+                          <div style={{ fontSize: 11, color: "var(--rose-700)", marginTop: 2 }}>{[apt.city, apt.bedrooms && `${apt.bedrooms}BR`, apt.sqft && `${apt.sqft} sqft`].filter(Boolean).join(" \u00b7 ")}</div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
+                          <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "var(--rose-600)" }}>${total.toLocaleString()}</div>
+                          <div style={{ fontSize: 9, color: "var(--rose-600)", textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>/month</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {filledApts.length === 0 && (
+            <div style={{ textAlign: "center", padding: "48px 24px", background: "#fff", borderRadius: 16, border: "1.5px solid var(--rose-200)" }}>
+              <div style={{ fontSize: 44, marginBottom: 14 }}>\u2728</div>
+              <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: "var(--dark)", marginBottom: 6 }}>Get started</div>
+              <div style={{ fontSize: 13.5, color: "var(--rose-700)", lineHeight: 1.6, maxWidth: 380, margin: "0 auto" }}>Import your first listing or add an apartment manually to start comparing true monthly costs.</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════ CALCULATOR PAGE ═══════════════ */}
+      {page === "calculator" && (
+        <>
+          {/* Header */}
       <header style={{ position: "relative", overflow: "hidden", padding: isMobile ? "28px 18px 22px" : "36px 40px 28px", background: "linear-gradient(135deg, #fbeaef 0%, #f6d5df 100%)" }}>
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 80% 60% at 75% 40%, rgba(220,86,126,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
         <div style={{ position: "relative", zIndex: 1, maxWidth: 960, margin: "0 auto" }}>
@@ -571,7 +855,7 @@ export default function RentWise() {
         </div>
       </header>
 
-      {/* Nav */}
+          {/* Nav */}
       <div style={{ maxWidth: 960, margin: "0 auto", padding: isMobile ? "16px 14px 0" : "18px 40px 0" }}>
         <div style={{ display: "flex", gap: 4, background: "#fff", borderRadius: 10, padding: 3, border: "1.5px solid var(--rose-100)", boxShadow: "0 2px 8px rgba(212,43,94,0.06)" }}>
           {[
@@ -600,7 +884,7 @@ export default function RentWise() {
         </div>
       </div>
 
-      {/* Body */}
+          {/* Body */}
       <div style={{ maxWidth: 960, margin: "0 auto", padding: isMobile ? "18px 14px 60px" : "20px 40px 60px" }}>
 
         {/* ═══════ CARDS VIEW ═══════ */}
@@ -1120,9 +1404,140 @@ export default function RentWise() {
         })}
           </div>
         )}
-      </div>
+
+          </div>
+        </>
+      )}
+
+      {/* ═══════════════ IMPORT PAGE ═══════════════ */}
+      {page === "import" && (
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: isMobile ? "20px 14px 60px" : "28px 40px 60px" }}>
+          {importStep === 0 && (
+            <div className="fade-up">
+              <div style={{ background: "linear-gradient(135deg, #fbeaef 0%, #f6d5df 100%)", borderRadius: 18, padding: isMobile ? "28px 20px" : "40px 36px", marginBottom: 20, position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 80% 60% at 75% 40%, rgba(220,86,126,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
+                <div style={{ position: "relative", zIndex: 1 }}>
+                  <div style={{ fontSize: isMobile ? 10.5 : 10, letterSpacing: 3.5, textTransform: "uppercase", color: "var(--rose-600)", marginBottom: 8, fontWeight: 600 }}>\ud83d\udd17 AI Import</div>
+                  <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: isMobile ? 26 : 34, fontWeight: 400, color: "var(--rose-900)", lineHeight: 1.15, letterSpacing: -0.5, marginBottom: 10 }}>Import a <span style={{ fontStyle: "italic", color: "var(--rose-500)" }}>Listing</span></h1>
+                  <p style={{ fontSize: isMobile ? 13 : 14, color: "var(--rose-800)", lineHeight: 1.6, maxWidth: 480 }}>Paste an apartment listing URL from Apartments.com, Zillow, Trulia, or any other listing site. Our AI will extract unit details, pricing, and fees automatically.</p>
+                </div>
+              </div>
+              <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid var(--rose-200)", padding: isMobile ? "24px 18px" : "32px 28px", boxShadow: "0 4px 20px rgba(0,0,0,0.04)" }}>
+                <label style={{ display: "block", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--rose-700)", fontWeight: 600, marginBottom: 8 }}>Listing URL</label>
+                <div style={{ display: "flex", gap: 10, flexDirection: isMobile ? "column" : "row" }}>
+                  <input ref={importInputRef} type="url" value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && handleImport()} placeholder="https://www.apartments.com/..." style={{ flex: 1, padding: "12px 14px", border: "1.5px solid var(--rose-200)", borderRadius: 10, fontSize: 14, fontFamily: "'DM Sans', sans-serif", color: "var(--dark)", background: "var(--warm-white)" }} />
+                  <button onClick={handleImport} disabled={!importUrl.trim()} style={{ padding: "12px 24px", border: "none", borderRadius: 10, cursor: importUrl.trim() ? "pointer" : "default", background: importUrl.trim() ? "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)" : "var(--rose-100)", color: importUrl.trim() ? "#fff" : "var(--rose-300)", fontSize: 14, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>Import Listing \u2728</button>
+                </div>
+                {importError && (
+                  <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 10, background: "var(--coral-light)", border: "1px solid rgba(192,112,96,0.3)" }}>
+                    <div style={{ fontSize: 13, color: "var(--coral)", fontWeight: 600 }}>\u26a0 Import Failed</div>
+                    <div style={{ fontSize: 12.5, color: "#8b5a4f", marginTop: 4, lineHeight: 1.5 }}>{importError}</div>
+                  </div>
+                )}
+                <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--rose-100)" }}>
+                  <div style={{ fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 8 }}>Supported Sites</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {["Apartments.com", "Zillow", "Trulia", "Realtor.com", "Rent.com", "HotPads", "Redfin", "& more"].map(site => (
+                      <span key={site} style={{ fontSize: 11.5, padding: "3px 10px", borderRadius: 20, background: "var(--rose-50)", color: "var(--rose-700)", fontWeight: 500 }}>{site}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {importStep === 1 && (
+            <div style={{ textAlign: "center", padding: "60px 24px" }}>
+              <div style={{ width: 48, height: 48, border: "3px solid var(--rose-200)", borderTop: "3px solid var(--rose-500)", borderRadius: "50%", margin: "0 auto 24px", animation: "spin 0.8s linear infinite" }} />
+              <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "var(--dark)", marginBottom: 8 }}>Analyzing listing...</div>
+              <div style={{ fontSize: 14, color: "var(--rose-700)", animation: "pulse 2s ease infinite" }}>{importLoadingMsg}</div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 24 }}>
+                {[0,1,2].map(i => (<div key={i} style={{ width: isMobile ? 80 : 120, height: 8, borderRadius: 4, background: "linear-gradient(90deg, var(--rose-100) 0%, var(--rose-200) 50%, var(--rose-100) 100%)", backgroundSize: "200% 100%", animation: `shimmer 1.5s ease infinite ${i * 0.3}s` }} />))}
+              </div>
+            </div>
+          )}
+          {importStep === 2 && importData && (
+            <div className="fade-up">
+              <div style={{ background: "linear-gradient(135deg, #fbeaef 0%, #f6d5df 100%)", borderRadius: 16, padding: isMobile ? "18px 16px" : "22px 24px", marginBottom: 16 }}>
+                <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: isMobile ? 22 : 26, color: "var(--rose-900)", lineHeight: 1.2 }}>{importData.building.name}</div>
+                <div style={{ fontSize: 13, color: "var(--rose-700)", marginTop: 4 }}>{importData.building.address}</div>
+                <div style={{ fontSize: 13, color: "var(--rose-600)", marginTop: 4, fontWeight: 600 }}>{importData.units.length} units found</div>
+                {importData.building.special && (<div style={{ marginTop: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.6)", fontSize: 12.5, color: "var(--rose-800)", lineHeight: 1.5 }}>\ud83c\udf89 {importData.building.special}</div>)}
+              </div>
+              {(() => {
+                const bedTypes = [...new Set(importData.units.map(u => u.beds))].sort();
+                return (<div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>{["All", ...bedTypes].map(t => (<button key={t} onClick={() => setImportFilter(t)} style={{ padding: "6px 14px", borderRadius: 20, border: "none", cursor: "pointer", background: importFilter === t ? "var(--dark)" : "var(--rose-50)", color: importFilter === t ? "#fff" : "var(--rose-700)", fontSize: 12, fontWeight: 500, fontFamily: "'DM Sans', sans-serif" }}>{t}{t === "All" ? ` (${importData.units.length})` : ""}</button>))}</div>);
+              })()}
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                {importData.units.filter(u => importFilter === "All" || u.beds === importFilter).map((unit, i) => (
+                  <button key={i} onClick={() => handleSelectUnit(unit)} className="action-btn" style={{ padding: "14px 16px", border: "1.5px solid var(--rose-200)", borderRadius: 12, background: "#fff", cursor: "pointer", textAlign: "left", display: "block", width: "100%", fontFamily: "'DM Sans', sans-serif" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--dark)" }}>{unit.unit || `Unit ${i + 1}`}</div>
+                        <div style={{ fontSize: 11.5, color: "var(--rose-700)", marginTop: 2 }}>{[unit.beds, unit.baths && `${unit.baths} ba`, unit.sqft && `${unit.sqft} sqft`].filter(Boolean).join(" \u00b7 ")}</div>
+                        {unit.available && <div style={{ fontSize: 11, color: "var(--rose-600)", marginTop: 3 }}>\ud83d\udcc5 {unit.available}</div>}
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: "var(--rose-600)" }}>${parseInt(String(unit.rent).replace(/[^0-9]/g, "")).toLocaleString()}</div>
+                        <div style={{ fontSize: 9, color: "var(--rose-600)", textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>/month</div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <button onClick={handleImportAnother} style={{ marginTop: 16, padding: "10px 18px", border: "1px solid var(--rose-200)", borderRadius: 10, background: "transparent", cursor: "pointer", fontSize: 13, color: "var(--rose-700)", fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>\u2190 Try Different URL</button>
+            </div>
+          )}
+          {importStep === 3 && importPrefilled && (
+            <div className="fade-up">
+              <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid var(--rose-200)", overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.04)" }}>
+                <div style={{ background: "linear-gradient(135deg, #fbeaef 0%, #f6d5df 100%)", padding: isMobile ? "18px 16px" : "22px 24px" }}>
+                  <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 6 }}>Review & Add</div>
+                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: isMobile ? 22 : 26, color: "var(--rose-900)", lineHeight: 1.2 }}>{importPrefilled.name}</div>
+                  <div style={{ fontSize: 13, color: "var(--rose-700)", marginTop: 4 }}>{[importPrefilled.address, importPrefilled.city].filter(Boolean).join(", ")}</div>
+                </div>
+                <div style={{ padding: isMobile ? "18px 16px" : "22px 24px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 18 }}>
+                    {[{ label: "Bedrooms", value: importPrefilled.bedrooms === "0" ? "Studio" : `${importPrefilled.bedrooms} BR` }, { label: "Sq Ft", value: importPrefilled.sqft || "\u2014" }, { label: "Lease", value: importPrefilled.leaseterm ? `${importPrefilled.leaseterm} mo` : "\u2014" }, { label: "Neighborhood", value: importPrefilled.neighborhood || "\u2014" }].map(d => (
+                      <div key={d.label}><div style={{ fontSize: 9.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 2 }}>{d.label}</div><div style={{ fontSize: 14, fontWeight: 600, color: "var(--dark)" }}>{d.value}</div></div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 8 }}>\ud83d\udcb0 Monthly Costs</div>
+                  {COST_CATEGORIES.filter(cat => importPrefilled.costs[cat.key] && importPrefilled.costs[cat.key] !== "0").map(cat => (
+                    <div key={cat.key} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid var(--rose-100)" }}>
+                      <span style={{ fontSize: 13, color: "#3a3a3a" }}>{cat.icon} {cat.label}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--dark)" }}>${parseInt(importPrefilled.costs[cat.key]).toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: "2px solid var(--dark)" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>Estimated Monthly Total</span>
+                    <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: "var(--dark)" }}>${COST_CATEGORIES.reduce((s, c) => s + (parseInt(importPrefilled.costs[c.key]) || 0), 0).toLocaleString()}</span>
+                  </div>
+                  {importPrefilled.notes && (<div style={{ marginTop: 16 }}><div style={{ fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--rose-600)", fontWeight: 600, marginBottom: 6 }}>\ud83d\udcdd Notes</div><div style={{ fontSize: 12.5, color: "#5a5a5a", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{importPrefilled.notes}</div></div>)}
+                  <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                    <button onClick={() => setImportStep(2)} style={{ flex: 1, padding: "12px 16px", border: "1px solid var(--rose-200)", borderRadius: 10, background: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 500, color: "var(--rose-700)", fontFamily: "'DM Sans', sans-serif" }}>\u2190 Pick Different Unit</button>
+                    <button onClick={handleAddToRentwise} style={{ flex: 1, padding: "12px 16px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#fff", fontFamily: "'DM Sans', sans-serif" }}>Add to RentWise \u2728</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {importStep === 4 && (
+            <div className="fade-up" style={{ textAlign: "center", padding: "48px 24px" }}>
+              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--green-light)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 20px", border: "2px solid var(--green)" }}>\u2713</div>
+              <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, color: "var(--dark)", marginBottom: 8 }}>Added to RentWise!</div>
+              <div style={{ fontSize: 14, color: "var(--rose-700)", marginBottom: 24, lineHeight: 1.6 }}>{importPrefilled?.name} is now in your Cost Calculator.</div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                <button onClick={handleImportGoToCalculator} style={{ padding: "12px 24px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, var(--rose-500) 0%, var(--rose-600) 100%)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#fff", fontFamily: "'DM Sans', sans-serif" }}>View in Calculator \u2192</button>
+                <button onClick={handleImportAnother} style={{ padding: "12px 24px", border: "1px solid var(--rose-200)", borderRadius: 10, background: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 500, color: "var(--rose-700)", fontFamily: "'DM Sans', sans-serif" }}>Import Another</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
+
 }
 
 function MetaInput({ label, value, onChange, placeholder, type = "text", isMobile }) {
